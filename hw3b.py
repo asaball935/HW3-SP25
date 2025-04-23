@@ -1,77 +1,53 @@
-import scipy.integrate as integrate
-import scipy.special as special
-import numpy as np
+import math
 
 
-def gamma_function(alpha):
-    """
-    Compute the Gamma function for a given alpha.
-    This is a mathematical function that generalizes the factorial function.
-    """
-    return special.gamma(alpha)
+def gamma_fn(x):
+    """Approximate the Gamma function using factorial or Stirling's approximation."""
+    if x == int(x) and x > 0:
+        product = 1
+        for i in range(1, int(x)):
+            product *= i
+        return product
+    else:
+        # Stirling's approximation for real-valued gamma function
+        return math.sqrt(2 * math.pi / x) * (x / math.e) ** x
 
 
-def t_distribution_probability(m, z):
-    """
-    Compute the cumulative distribution function (CDF) for a t-distribution with m degrees of freedom.
-    This function calculates the probability P(T ≤ z) for a given t-distribution.
-    """
-    # Gamma constant factor
-    Km = gamma_function(0.5 * m + 0.5) / (np.sqrt(m * np.pi) * gamma_function(0.5 * m))
+def t_dist_cdf(df, limit):
+    """Estimate cumulative probability P(T ≤ z) using trapezoidal integration."""
+    # Normalizing constant
+    const = gamma_fn((df + 1) / 2) / (math.sqrt(df * math.pi) * gamma_fn(df / 2))
 
-    def integrand(u):
-        """
-        The integrand function for the t-distribution probability calculation.
-        This represents the probability density function (PDF) for the t-distribution.
-        """
-        return (1 + (u ** 2) / m) ** (-(m + 1) / 2)
+    def t_pdf(u):
+        return (1 + (u ** 2) / df) ** (-(df + 1) / 2)
 
-    # Perform the numerical integration to calculate the CDF from -∞ to z
-    result, _ = integrate.quad(integrand, -np.inf, z)
+    def trapezoid_area(f, x_start, x_end, steps=1000):
+        width = (x_end - x_start) / steps
+        total = 0.5 * (f(x_start) + f(x_end))
+        for j in range(1, steps):
+            total += f(x_start + j * width)
+        return total * width
 
-    # Return the final probability scaled by the constant Km
-    return Km * result
+    return const * trapezoid_area(t_pdf, -100, limit)
 
 
-def prompt_user_input():
-    """
-    Function to handle user input, validate, and ensure proper numeric input.
-    """
+def run_t_distribution_tool():
+    """Main interactive loop to compute t-distribution probabilities."""
+    print("T-Distribution CDF Calculator")
     while True:
         try:
-            m = int(input("Enter the degrees of freedom (m): "))
-            z = float(input("Enter the value of z: "))
-            if m <= 0:
-                print("Degrees of freedom (m) should be a positive integer.")
-                continue
-            return m, z
+            df = int(input("Degrees of freedom (positive integer): "))
+            t_val = float(input("z (T-value): "))
+
+            prob = t_dist_cdf(df, t_val)
+            print(f"P(T ≤ {t_val} | df = {df}) ≈ {prob:.4f}")
         except ValueError:
-            print("Invalid input. Please enter valid numeric values.")
+            print("Invalid input. Please enter numeric values only.")
 
-
-def main():
-    """
-    Main driver function to interact with the user, perform computations, and display results.
-    """
-    print("Welcome to the T-Distribution Probability Calculator!")
-
-    while True:
-        # Prompt for user input
-        m, z = prompt_user_input()
-
-        # Calculate the probability
-        probability = t_distribution_probability(m, z)
-
-        # Display the result
-        print(f"P(T ≤ {z} | m = {m}) = {probability:.4f}")
-
-        # Ask the user if they want to compute another probability
-        again = input("Would you like to calculate another probability? (y/n): ").strip().lower()
-        if again not in ["y", "yes"]:
-            print("Thank you for using the T-Distribution Probability Calculator. Goodbye!")
+        repeat = input("Run another calculation? (y/n): ").strip().lower()
+        if repeat not in {"y", "yes"}:
             break
 
 
 if __name__ == "__main__":
-    main()
-
+    run_t_distribution_tool()

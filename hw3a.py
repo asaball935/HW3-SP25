@@ -1,92 +1,93 @@
-from numericalMethods import GPDF, Probability, Secant
+#region imports
+from math import sqrt, pi, exp
 
+# ========== hw3a.py ==========
+def GPDF(x, mu, sig):
+    return (1 / (sig * sqrt(2 * pi))) * exp(-0.5 * ((x - mu) / sig) ** 2)
 
-# Secant Method for Numerical Solution
-def secant_method(func, x0, x1, tol=1e-5, max_iter=100):
-    """
-    Secant method to find the root of a function
-    :param func: The function to find the root of
-    :param x0: The initial guess
-    :param x1: The second initial guess
-    :param tol: The tolerance for convergence
-    :param max_iter: The maximum number of iterations
-    :return: The root of the function, or None if max iterations are reached
-    """
-    for i in range(max_iter):
-        fx0 = func(x0)
-        fx1 = func(x1)
-        if abs(fx1 - fx0) < tol:
-            return x1  # Convergence check
-        # Secant update
+def Simpson(f, mu, sig, a, b, N=100):
+    if N % 2: N += 1
+    h = (b - a) / N
+    result = f(a, mu, sig) + f(b, mu, sig)
+    for i in range(1, N):
+        coeff = 4 if i % 2 else 2
+        result += coeff * f(a + i * h, mu, sig)
+    return (h / 3) * result
+
+def Probability(PDF, args, c, GT=True):
+    mu, sig = args
+    p = Simpson(PDF, mu, sig, mu - 5 * sig, c)
+    return 1 - p if GT else p
+
+def Secant(f, x0, x1, tol=1e-5, max_iter=50):
+    for _ in range(max_iter):
+        fx0, fx1 = f(x0), f(x1)
+        if fx1 - fx0 == 0: break
         x2 = x1 - fx1 * (x1 - x0) / (fx1 - fx0)
+        if abs(x2 - x1) < tol: return x2
         x0, x1 = x1, x2
-    return None  # Return None if it doesn't converge
-
-
-# Define a function for the probability difference (used in secant method)
-def find_probability_difference(c, mean, stDev, target_prob, GT, OneSided):
-    """
-    This function returns the difference between the desired probability and the computed probability for a given c.
-    :param c: The value of c to test
-    :param mean: The population mean
-    :param stDev: The standard deviation
-    :param target_prob: The target probability (P)
-    :param GT: Whether the user wants P(x > c)
-    :param OneSided: Whether the integration is one-sided
-    :return: The difference between the computed probability and the target probability
-    """
-    if OneSided:
-        prob = Probability(GPDF, (mean, stDev), c, GT=GT)
-    else:
-        prob = Probability(GPDF, (mean, stDev), c, GT=True)
-        prob = 1 - 2 * prob
-    return prob - target_prob
-
+    return x1
 
 def main():
-    """
-    This program allows the user to either specify a probability and solve for c,
-    or specify a c value and solve for the probability.
-    """
     Again = True
-    mean = 0
+    mean = 0.0
     stDev = 1.0
+    c = 0.5
+    probability = 0.5
     OneSided = True
     GT = False
     yesOptions = ["y", "yes", "true"]
 
     while Again:
-        # Ask user if they are specifying c or P
-        response = input(
-            "Specify c and solve for P (enter 'c') or specify P and solve for c (enter 'P'): ").strip().lower()
+        response = input(f"Population mean? ({mean:0.3f}) ").strip().lower()
+        mean = float(response) if response else mean
 
-        if response == 'c':  # User specifies c, we compute the probability
-            c = float(input(f"Enter value for c: ({0.5}) ").strip() or "0.5")
-            prob = Probability(GPDF, (mean, stDev), c, GT=GT) if OneSided else Probability(GPDF, (mean, stDev), c,
-                                                                                           GT=True)
-            prob = prob if OneSided else 1 - 2 * prob
-            print(f"P(x{'>' if GT else '<'}{c:0.2f}|{mean:0.2f},{stDev:0.2f}) = {prob:0.3f}")
+        response = input(f"Standard deviation? ({stDev:0.3f}) ").strip().lower()
+        stDev = float(response) if response else stDev
 
-        elif response == 'P':  # User specifies P, we solve for c
-            target_prob = float(input("Enter the target probability P (e.g., 0.95): ").strip())
+        mode = input("Are you specifying c to find P or specifying P to find c? (Enter 'c' or 'p') ").strip().lower()
 
-            # Find initial guesses for the secant method
-            x0 = 0.1  # A reasonable initial guess
-            x1 = 5.0  # A second reasonable initial guess
+        if mode == 'c':
+            response = input(f"c value? ({c:0.3f}) ").strip().lower()
+            c = float(response) if response else c
 
-            # Secant method to find the value of c
-            func = lambda c: find_probability_difference(c, mean, stDev, target_prob, GT, OneSided)
-            c_solution = secant_method(func, x0, x1)
+            response = input(f"Probability greater than c? ({GT}) ").strip().lower()
+            GT = True if response in yesOptions else False
 
-            if c_solution is not None:
-                print(f"Value of c that gives probability {target_prob:0.3f} is c = {c_solution:0.3f}")
+            response = input(f"One sided? ({OneSided}) ").strip().lower()
+            OneSided = True if response in yesOptions else False
+
+            if OneSided:
+                prob = Probability(GPDF, (mean, stDev), c, GT=GT)
+                print(f"P(x {'>' if GT else '<'} {c:0.2f} | {mean:0.2f}, {stDev:0.2f}) = {prob:0.3f}")
             else:
-                print("Secant method did not converge.")
+                prob = Probability(GPDF, (mean, stDev), c, GT=True)
+                prob = 1 - 2 * prob
+                if GT:
+                    print(f"P({mean - (c - mean)} > x > {mean + (c - mean)} | {mean:0.2f}, {stDev:0.2f}) = {1 - prob:0.3f}")
+                else:
+                    print(f"P({mean - (c - mean)} < x < {mean + (c - mean)} | {mean:0.2f}, {stDev:0.2f}) = {prob:0.3f}")
 
-        # Ask if user wants to go again
-        response = input(f"Go again? (Y/N): ").strip().lower()
-        Again = True if response in yesOptions else False
+        elif mode == 'p':
+            response = input(f"Desired probability? ({probability:0.3f}) ").strip().lower()
+            probability = float(response) if response else probability
 
+            response = input(f"Probability greater than c? ({GT}) ").strip().lower()
+            GT = True if response in yesOptions else False
+
+            response = input(f"One sided? ({OneSided}) ").strip().lower()
+            OneSided = True if response in yesOptions else False
+
+            if OneSided:
+                c = Secant(lambda c: Probability(GPDF, (mean, stDev), c, GT=GT) - probability, 0.0, 1.0)
+                print(f"c value for P(x {'>' if GT else '<'} {c:0.2f} | {mean:0.2f}, {stDev:0.2f}) = {c:0.3f}")
+            else:
+                func = lambda c: (1 - 2 * Probability(GPDF, (mean, stDev), c, GT=True)) - probability
+                c = Secant(func, 0.0, 1.0)
+                print(f"c value for P({mean - (c - mean)} < x < {mean + (c - mean)} | {mean:0.2f}, {stDev:0.2f}) = {c:0.3f}")
+
+        response = input("Go again? (Y/N) ").strip().lower()
+        Again = response in yesOptions
 
 if __name__ == "__main__":
     main()
